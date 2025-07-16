@@ -1,7 +1,7 @@
 // server.js
 const express = require("express");
 const cors = require("cors");
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
 const app = express();
 const port = process.env.PORT || 3000;
@@ -85,13 +85,28 @@ async function run() {
 
     // all propertise added by egnet
     app.get("/properties/agent", async (req, res) => {
-      const email = req.query.email;
-      const result = await propertiesCollection
-        .find({ agentEmail: email })
-        .toArray();
-      res.send(result);
+      try {
+        const email = req.query.email;
+        const result = await propertiesCollection
+          .find({ agentEmail: email })
+          .toArray();
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch agent properties" });
+      }
     });
-   
+
+    //  delete properties
+    app.delete("/properties/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await propertiesCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to delete property" });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
