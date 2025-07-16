@@ -26,6 +26,21 @@ async function run() {
     const db = client.db("bashabari");
     const usersCollection = db.collection("users");
     const propertiesCollection = db.collection("properties");
+    await propertiesCollection.createIndex({ agentEmail: 1 });
+
+    //  show all properties
+
+    // Get all verified properties
+    app.get("/properties", async (req, res) => {
+      try {
+        const verifiedProperties = await propertiesCollection
+          .find({ status: "verified" })
+          .toArray();
+        res.send(verifiedProperties);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch properties" });
+      }
+    });
 
     /*   ========================================
       users relited API's
@@ -95,6 +110,24 @@ async function run() {
         res.status(500).send({ error: "Failed to fetch agent properties" });
       }
     });
+    // get single property by id
+    app.get("/properties/:id", async (req, res) => {
+      const id = req.params.id;
+
+      try {
+        const property = await propertiesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!property) {
+          return res.status(404).send({ message: "Property not found" });
+        }
+
+        res.send(property);
+      } catch (err) {
+        res.status(500).send({ error: "Failed to fetch property" });
+      }
+    });
 
     //  delete properties
     app.delete("/properties/:id", async (req, res) => {
@@ -106,6 +139,21 @@ async function run() {
       } catch (error) {
         res.status(500).send({ error: "Failed to delete property" });
       }
+    });
+
+    // update properties
+    app.patch("/properties/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedProperty = req.body;
+      console.log("Update request for property ID:", id);
+      console.log("Update data:", updatedProperty);
+
+      const result = await propertiesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { ...updatedProperty, status: "pending" } }
+      );
+      console.log("Update result:", result);
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
