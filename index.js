@@ -25,7 +25,7 @@ async function run() {
     await client.connect();
     const db = client.db("bashabari");
     const usersCollection = db.collection("users");
-    const propertiesCollection= db.collection("properties")
+    const propertiesCollection = db.collection("properties");
 
     /*   ========================================
       users relited API's
@@ -51,7 +51,7 @@ async function run() {
     /*   ========================================
       agent  relited API's
       ========================================== */
-      //  add properties
+    //  add properties
     app.post("/properties", async (req, res) => {
       const property = req.body;
 
@@ -78,10 +78,20 @@ async function run() {
     /**
      Get all properties - For testing
      */
-    app.get("/properties", async (req, res) => {
-      const result = await propertiesCollection.find().toArray();
+    // app.get("/properties", async (req, res) => {
+    //   const result = await propertiesCollection.find().toArray();
+    //   res.send(result);
+    // });
+
+    // all propertise added by egnet
+    app.get("/properties/agent", async (req, res) => {
+      const email = req.query.email;
+      const result = await propertiesCollection
+        .find({ agentEmail: email })
+        .toArray();
       res.send(result);
     });
+   
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
