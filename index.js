@@ -25,6 +25,11 @@ async function run() {
     await client.connect();
     const db = client.db("bashabari");
     const usersCollection = db.collection("users");
+    const propertiesCollection= db.collection("properties")
+
+    /*   ========================================
+      users relited API's
+      ========================================== */
 
     // add user to db
     app.post("/users", async (req, res) => {
@@ -42,6 +47,42 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send({ message: "User added", inserted: true, result });
     });
+
+    /*   ========================================
+      agent  relited API's
+      ========================================== */
+      //  add properties
+    app.post("/properties", async (req, res) => {
+      const property = req.body;
+
+      // Validation: check required fields
+      if (
+        !property.title ||
+        !property.location ||
+        !property.image ||
+        !property.priceMin ||
+        !property.priceMax ||
+        !property.agentName ||
+        !property.agentEmail
+      ) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+
+      property.status = "pending";
+      property.createdAt = new Date();
+
+      const result = await propertiesCollection.insertOne(property);
+      res.send(result);
+    });
+
+    /**
+     Get all properties - For testing
+     */
+    app.get("/properties", async (req, res) => {
+      const result = await propertiesCollection.find().toArray();
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
