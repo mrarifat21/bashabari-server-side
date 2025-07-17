@@ -46,7 +46,10 @@ async function run() {
       try {
         const status = req.query.status; // e.g., 'verified' or 'pending'
         const query = status ? { status } : {}; // if status provided, filter; else return all
-        const properties = await propertiesCollection.find(query).toArray();
+        const properties = await propertiesCollection
+          .find(query)
+          .sort({ createdAt: -1 })
+          .toArray();
         res.send(properties);
       } catch (error) {
         res.status(500).send({ error: "Failed to fetch properties" });
@@ -213,6 +216,49 @@ async function run() {
         { $set: { status } }
       );
       res.send(result);
+    });
+    // ====manageUsers.jsx====
+    app.get("/users", async (req, res) => {
+      const users = await usersCollection.find().toArray();
+      res.send(users);
+    });
+
+    app.patch("/users/role/:id", async (req, res) => {
+      const { role } = req.body;
+      const result = await usersCollection.updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: { role } }
+      );
+      res.send(result);
+    });
+
+    app.patch("/users/fraud/:id", async (req, res) => {
+      const userId = req.params.id;
+
+      // 1. Update user status to fraud
+      await usersCollection.updateOne(
+        { _id: new ObjectId(userId) },
+        { $set: { status: "fraud" } }
+      );
+
+      // 2. Remove their properties from verified properties
+      await propertiesCollection.updateMany(
+        { agentId: userId },
+        { $set: { status: "fraud-removed" } }
+      );
+
+      res.send({ message: "User marked as fraud and properties updated." });
+    });
+
+    app.delete("/users/:id", async (req, res) => {
+      const id = req.params.id;
+      // Remove from MongoDB
+      await usersCollection.deleteOne({ _id: new ObjectId(id) });
+
+      // Optional: If you have Firebase Admin SDK setup
+      // await admin.auth().deleteUser(firebaseUid);
+
+      res.send({ message: "User deleted successfully." });
     });
 
     // Send a ping to confirm a successful connection
