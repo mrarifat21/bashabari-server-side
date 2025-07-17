@@ -33,6 +33,7 @@ async function run() {
     const db = client.db("bashabari");
     const usersCollection = db.collection("users");
     const propertiesCollection = db.collection("properties");
+    const wishlistCollection= db.collection('wishlist')
     await propertiesCollection.createIndex({ agentEmail: 1 });
 
     //  show all properties
@@ -331,6 +332,19 @@ async function run() {
         });
       }
     });
+
+
+    //  add to wishlist
+    app.post("/wishlist", async (req, res) => {
+  try {
+    const data = req.body;
+    const result = await wishlistCollection.insertOne(data);
+    res.send(result);
+  } catch (err) {
+    res.status(500).send({ error: "Failed to add to wishlist" });
+  }
+});
+
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
