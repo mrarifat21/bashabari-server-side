@@ -31,12 +31,23 @@ async function run() {
     //  show all properties
 
     // Get all verified properties
+    // app.get("/properties", async (req, res) => {
+    //   try {
+    //     const verifiedProperties = await propertiesCollection
+    //       .find({ status: "verified"})
+    //       .toArray();
+    //     res.send(verifiedProperties);
+    //   } catch (error) {
+    //     res.status(500).send({ error: "Failed to fetch properties" });
+    //   }
+    // });
+
     app.get("/properties", async (req, res) => {
       try {
-        const verifiedProperties = await propertiesCollection
-          .find({ status: "verified" })
-          .toArray();
-        res.send(verifiedProperties);
+        const status = req.query.status; // e.g., 'verified' or 'pending'
+        const query = status ? { status } : {}; // if status provided, filter; else return all
+        const properties = await propertiesCollection.find(query).toArray();
+        res.send(properties);
       } catch (error) {
         res.status(500).send({ error: "Failed to fetch properties" });
       }
@@ -104,13 +115,77 @@ async function run() {
         const email = req.query.email;
         const result = await propertiesCollection
           .find({ agentEmail: email })
+          .sort({ createdAt: -1 })
           .toArray();
         res.send(result);
       } catch (error) {
         res.status(500).send({ error: "Failed to fetch agent properties" });
       }
     });
-    // get single property by id
+    // get single property by id for updatePorperty.jsx
+    // app.get("/properties/:id", async (req, res) => {
+    //   const id = req.params.id;
+
+    //   try {
+    //     const property = await propertiesCollection.findOne({
+    //       _id: new ObjectId(id),
+    //     });
+
+    //     if (!property) {
+    //       return res.status(404).send({ message: "Property not found" });
+    //     }
+
+    //     res.send(property);
+    //   } catch (err) {
+    //     res.status(500).send({ error: "Failed to fetch property" });
+    //   }
+    // });
+
+    //  delete properties
+    app.delete("/properties/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const query = { _id: new ObjectId(id) };
+        const result = await propertiesCollection.deleteOne(query);
+        res.send(result);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to delete property" });
+      }
+    });
+
+    // update properties
+    app.patch("/properties/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedProperty = req.body;
+      // console.log("Update request for property ID:", id);
+      // console.log("Update data:", updatedProperty);
+
+      const result = await propertiesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: { ...updatedProperty, status: "pending" } }
+      );
+      // console.log("Update result:", result);
+      res.send(result);
+    });
+
+    /* =================
+      Admin Relited ApI's
+  ==================== */
+    // Get all pending properties
+
+    // app.get("/properties/pending", async (req, res) => {
+    //   try {
+    //     const pendingProperties = await propertiesCollection
+    //       .find({ status: "pending" })
+    //       .toArray();
+    //     res.send(pendingProperties);
+    //   } catch (error) {
+    //     console.error("Error fetching pending properties:", error);
+    //     res.status(500).send({ error: "Failed to fetch pending properties" });
+    //   }
+    // });
+
+    // get single property by id for updatePorperty.jsx
     app.get("/properties/:id", async (req, res) => {
       const id = req.params.id;
 
@@ -129,30 +204,14 @@ async function run() {
       }
     });
 
-    //  delete properties
-    app.delete("/properties/:id", async (req, res) => {
-      try {
-        const id = req.params.id;
-        const query = { _id: new ObjectId(id) };
-        const result = await propertiesCollection.deleteOne(query);
-        res.send(result);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to delete property" });
-      }
-    });
-
-    // update properties
-    app.patch("/properties/:id", async (req, res) => {
-      const id = req.params.id;
-      const updatedProperty = req.body;
-      console.log("Update request for property ID:", id);
-      console.log("Update data:", updatedProperty);
-
+    // PATCH /properties/status/:id
+    app.patch("/properties/status/:id", async (req, res) => {
+      const { id } = req.params;
+      const { status } = req.body;
       const result = await propertiesCollection.updateOne(
         { _id: new ObjectId(id) },
-        { $set: { ...updatedProperty, status: "pending" } }
+        { $set: { status } }
       );
-      console.log("Update result:", result);
       res.send(result);
     });
 
