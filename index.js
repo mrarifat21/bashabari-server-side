@@ -152,7 +152,12 @@ async function run() {
       res.send(result);
     });
 
-  
+    // GET /users/:email  ==> prevent add properties marked frud
+    app.get("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const user = await usersCollection.findOne({ email });
+      res.send(user);
+    });
 
     /**
      Get all properties - For testing
