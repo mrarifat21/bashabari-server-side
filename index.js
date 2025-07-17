@@ -19,6 +19,13 @@ const client = new MongoClient(process.env.MONGODB_URI, {
   },
 });
 
+const admin = require("firebase-admin");
+const serviceAccount = require("./firebase-adminsdk.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -31,16 +38,16 @@ async function run() {
     //  show all properties
 
     // Get all verified properties
-    // app.get("/properties", async (req, res) => {
-    //   try {
-    //     const verifiedProperties = await propertiesCollection
-    //       .find({ status: "verified"})
-    //       .toArray();
-    //     res.send(verifiedProperties);
-    //   } catch (error) {
-    //     res.status(500).send({ error: "Failed to fetch properties" });
-    //   }
-    // });
+    /* app.get("/properties", async (req, res) => {
+      try {
+        const verifiedProperties = await propertiesCollection
+          .find({ status: "verified"})
+          .toArray();
+        res.send(verifiedProperties);
+      } catch (error) {
+        res.status(500).send({ error: "Failed to fetch properties" });
+      }
+    }); */
 
     app.get("/properties", async (req, res) => {
       try {
@@ -53,6 +60,47 @@ async function run() {
         res.send(properties);
       } catch (error) {
         res.status(500).send({ error: "Failed to fetch properties" });
+      }
+    });
+
+    // GET /verified-properties-by-agents  get all properties for all properties page
+    app.get("/verified-properties-by-agents", async (req, res) => {
+      try {
+        const properties = await propertiesCollection
+          .aggregate([
+            {
+              $match: { status: "verified" },
+            },
+            {
+              $lookup: {
+                from: "users",
+                localField: "agentEmail",
+                foreignField: "email",
+                as: "agentInfo",
+              },
+            },
+            {
+              $unwind: "$agentInfo",
+            },
+            {
+              $match: {
+                "agentInfo.role": "agent",
+                $or: [
+                  { "agentInfo.status": { $exists: false } },
+                  { "agentInfo.status": { $ne: "fraud" } },
+                ],
+              },
+            },
+            {
+              $sort: { createdAt: -1 },
+            },
+          ])
+          .toArray();
+
+        res.send(properties);
+      } catch (error) {
+        console.error("Error fetching verified agent properties:", error);
+        res.status(500).send({ error: "Failed to fetch verified properties" });
       }
     });
 
@@ -103,6 +151,8 @@ async function run() {
       const result = await propertiesCollection.insertOne(property);
       res.send(result);
     });
+
+  
 
     /**
      Get all properties - For testing
@@ -217,6 +267,7 @@ async function run() {
       );
       res.send(result);
     });
+
     // ====manageUsers.jsx====
     app.get("/users", async (req, res) => {
       const users = await usersCollection.find().toArray();
@@ -252,13 +303,28 @@ async function run() {
 
     app.delete("/users/:id", async (req, res) => {
       const id = req.params.id;
-      // Remove from MongoDB
+
+      // 1. Find user in MongoDB
+      const user = await usersCollection.findOne({ _id: new ObjectId(id) });
+
+      if (!user) {
+        return res.status(404).send({ error: "User not found" });
+      }
+
+      // 2. Delete from MongoDB
       await usersCollection.deleteOne({ _id: new ObjectId(id) });
 
-      // Optional: If you have Firebase Admin SDK setup
-      // await admin.auth().deleteUser(firebaseUid);
-
-      res.send({ message: "User deleted successfully." });
+      // 3. Delete from Firebase
+      try {
+        await admin.auth().deleteUser(user.firebaseUid);
+        res.send({ message: "User deleted from DB and Firebase." });
+      } catch (error) {
+        console.error("Firebase deletion failed:", error);
+        res.status(200).send({
+          message: "User deleted from DB, but Firebase deletion failed.",
+          firebaseError: error.message,
+        });
+      }
     });
 
     // Send a ping to confirm a successful connection
