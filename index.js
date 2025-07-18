@@ -33,7 +33,8 @@ async function run() {
     const db = client.db("bashabari");
     const usersCollection = db.collection("users");
     const propertiesCollection = db.collection("properties");
-    const wishlistCollection= db.collection('wishlist')
+    const wishlistCollection = db.collection("wishlist");
+    const reviewsCollection = db.collection("review");
     await propertiesCollection.createIndex({ agentEmail: 1 });
 
     //  show all properties
@@ -332,19 +333,91 @@ async function run() {
         });
       }
     });
+    // manage rewiew
+    // GET all reviews (Admin only)
+    app.get("/admin/reviews", async (req, res) => {
+      try {
+        const result = await db.collection("reviews").find().toArray();
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch reviews" });
+      }
+    });
+    // DELETE a specific review by ID
+    app.delete("/admin/reviews/:id", async (req, res) => {
+      const { id } = req.params;
+      try {
+        const result = await db
+          .collection("reviews")
+          .deleteOne({ _id: new ObjectId(id) });
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to delete review" });
+      }
+    });
 
+    // ============
 
     //  add to wishlist
     app.post("/wishlist", async (req, res) => {
-  try {
-    const data = req.body;
-    const result = await wishlistCollection.insertOne(data);
-    res.send(result);
-  } catch (err) {
-    res.status(500).send({ error: "Failed to add to wishlist" });
-  }
-});
+      try {
+        const data = req.body;
+        const result = await wishlistCollection.insertOne(data);
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ error: "Failed to add to wishlist" });
+      }
+    });
+    // Check if property is already in wishlist
+    app.get("/wishlist/check", async (req, res) => {
+      const { email, propertyId } = req.query;
 
+      if (!email || !propertyId) {
+        return res
+          .status(400)
+          .send({ exists: false, message: "Missing email or propertyId" });
+      }
+
+      try {
+        const exists = await db.collection("wishlist").findOne({
+          userEmail: email,
+          propertyId: propertyId,
+        });
+
+        res.send({ exists: !!exists });
+      } catch (error) {
+        console.error("Wishlist check error:", error);
+        res.status(500).send({ exists: false });
+      }
+    });
+
+    // POST /reviews
+    app.post("/reviews", async (req, res) => {
+      try {
+        const review = req.body;
+        const result = await db.collection("reviews").insertOne(review);
+        res.send(result);
+      } catch (error) {
+        console.error("Error adding review:", error);
+        res.status(500).send({ error: "Failed to add review" });
+      }
+    });
+
+    // GET /reviews/:propertyId
+    app.get("/reviews/:propertyId", async (req, res) => {
+      const { propertyId } = req.params;
+      try {
+        const reviews = await db
+          .collection("reviews")
+          .find({ propertyId })
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.send(reviews);
+      } catch (error) {
+        console.error("Error fetching reviews:", error);
+        res.status(500).send({ error: "Failed to fetch reviews" });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
