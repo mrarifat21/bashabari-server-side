@@ -34,7 +34,7 @@ async function run() {
     const usersCollection = db.collection("users");
     const propertiesCollection = db.collection("properties");
     const wishlistCollection = db.collection("wishlist");
-    const reviewsCollection = db.collection("review");
+    const reviewsCollection = db.collection("reviews");
     await propertiesCollection.createIndex({ agentEmail: 1 });
 
     //  show all properties
@@ -126,6 +126,35 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send({ message: "User added", inserted: true, result });
     });
+
+    // user review section
+    // GET reviews by user email
+    app.get("/reviews", async (req, res) => {
+      const email = req.query.email;
+      if (!email) return res.status(400).send({ message: "Email required" });
+
+      try {
+        const result = await db
+          .collection("reviews")
+          .find({ userEmail: email })
+          .toArray();
+        res.send(result);
+      } catch (err) {
+        res.status(500).send({ message: "Failed to fetch reviews" });
+      }
+    });
+    // DELETE review
+    // app.delete("/reviews/:id", async (req, res) => {
+    //   const { id } = req.params;
+    //   try {
+    //     const result = await db
+    //       .collection("reviews")
+    //       .deleteOne({ _id: new ObjectId(id) });
+    //     res.send(result);
+    //   } catch (err) {
+    //     res.status(500).send({ message: "Delete failed" });
+    //   }
+    // });
 
     /*   ========================================
       agent  relited API's
@@ -395,6 +424,7 @@ async function run() {
     app.post("/reviews", async (req, res) => {
       try {
         const review = req.body;
+        review.createdAt = new Date(); // ✅ Add this
         const result = await db.collection("reviews").insertOne(review);
         res.send(result);
       } catch (error) {
@@ -404,18 +434,32 @@ async function run() {
     });
 
     // GET /reviews/:propertyId
-    app.get("/reviews/:propertyId", async (req, res) => {
-      const { propertyId } = req.params;
+    app.get("/reviews/user", async (req, res) => {
       try {
-        const reviews = await db
-          .collection("reviews")
-          .find({ propertyId })
+        const email = req.query.email; // or req.user.email if using Firebase Auth middleware
+        if (!email) return res.status(400).send({ error: "Email is required" });
+
+        const reviews = await reviewsCollection
+          .find({ userEmail: email })
           .sort({ createdAt: -1 })
           .toArray();
+
         res.send(reviews);
-      } catch (error) {
-        console.error("Error fetching reviews:", error);
-        res.status(500).send({ error: "Failed to fetch reviews" });
+      } catch (err) {
+        console.error("Error fetching user reviews:", err);
+        res.status(500).send({ error: "Internal server error" });
+      }
+    });
+    app.delete("/reviews/:id", async (req, res) => {
+      try {
+        const reviewId = req.params.id;
+        const result = await reviewsCollection.deleteOne({
+          _id: new ObjectId(reviewId),
+        });
+        res.send(result);
+      } catch (err) {
+        console.error("Error deleting review:", err);
+        res.status(500).send({ error: "Failed to delete review" });
       }
     });
 
