@@ -35,6 +35,7 @@ async function run() {
     const propertiesCollection = db.collection("properties");
     const wishlistCollection = db.collection("wishlist");
     const reviewsCollection = db.collection("reviews");
+    const offersCollection = db.collection("offer")
     await propertiesCollection.createIndex({ agentEmail: 1 });
 
     //  show all properties
@@ -50,6 +51,38 @@ async function run() {
         res.status(500).send({ error: "Failed to fetch properties" });
       }
     }); */
+
+// ====
+   // GET: Get user role by email
+    app.get("/users/:email/role", async (req, res) => {
+      try {
+        const email = req.params.email;
+
+        if (!email) {
+          return res.status(400).send({ message: "Email is required" });
+        }
+
+        const user = await usersCollection.findOne({ email });
+
+        if (!user) {
+          return res.status(404).send({ message: "User not found" });
+        }
+
+        res.send({ role: user.role || "user" });
+      } catch (error) {
+        console.error("Error getting user role:", error);
+        res.status(500).send({ message: "Failed to get role" });
+      }
+    });
+
+
+// =====
+
+
+
+
+
+
 
     app.get("/properties", async (req, res) => {
       try {
@@ -143,6 +176,85 @@ async function run() {
         res.status(500).send({ message: "Failed to fetch reviews" });
       }
     });
+    //  wish list
+    app.get("/wishlist", async (req, res) => {
+      const email = req.query.email;
+      const result = await wishlistCollection
+        .find({ userEmail: email })
+        .toArray();
+      res.send(result);
+    });
+
+    app.get("/wishlist/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await wishlistCollection.findOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
+    app.delete("/wishlist/:id", async (req, res) => {
+      const id = req.params.id;
+      const result = await wishlistCollection.deleteOne({
+        _id: new ObjectId(id),
+      });
+      res.send(result);
+    });
+
+    // make an offer
+    app.post("/offers", async (req, res) => {
+      const offer = req.body;
+      if (
+        !offer.buyerEmail ||
+        offer.offerAmount < offer.priceMin ||
+        offer.offerAmount > offer.priceMax
+      ) {
+        return res.status(400).send({ message: "Invalid offer" });
+      }
+
+      const result = await offersCollection.insertOne(offer);
+      res.send(result);
+    });
+    // property bougth
+    // Get offers by user email
+app.get("/offers/user", async (req, res) => {
+  const email = req.query.email;
+  if (!email) return res.status(400).send({ error: "Email query required" });
+
+  try {
+    const offers = await offersCollection
+      .find({ buyerEmail: email })
+      .toArray();
+    res.send(offers);
+  } catch (err) {
+    res.status(500).send({ error: err.message });
+  }
+});
+
+// Update offer status after payment (mock)
+/* app.patch("/offers/pay/:id", async (req, res) => {
+  const id = req.params.id;
+  const { status, transactionId } = req.body;
+
+  if (!ObjectId.isValid(id)) return res.status(400).send({ error: "Invalid ID" });
+
+  try {
+    const updateResult = await offersCollection.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status, transactionId } }
+    );
+
+    if (updateResult.modifiedCount === 1) {
+      res.send({ message: "Payment status updated" });
+    } else {
+      res.status(404).send({ error: "Offer not found" });
+    }
+  } catch (err) {
+    res.status(500).send({ error: err.message });
+  }
+}); */
+
+    // ==============================
     // DELETE review
     // app.delete("/reviews/:id", async (req, res) => {
     //   const { id } = req.params;
