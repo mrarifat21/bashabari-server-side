@@ -35,7 +35,7 @@ async function run() {
     const propertiesCollection = db.collection("properties");
     const wishlistCollection = db.collection("wishlist");
     const reviewsCollection = db.collection("reviews");
-    const offersCollection = db.collection("offer")
+    const offersCollection = db.collection("offer");
     await propertiesCollection.createIndex({ agentEmail: 1 });
 
     //  show all properties
@@ -52,8 +52,80 @@ async function run() {
       }
     }); */
 
-// ====
-   // GET: Get user role by email
+    // home page
+    // Backend: Express route
+    app.get("/properties/advertised", async (req, res) => {
+      try {
+        const advertisedProperties = await propertiesCollection
+          .aggregate([
+            {
+              $match: {
+                isAdvertised: true,
+                status: "verified",
+              },
+            },
+            {
+              $lookup: {
+                from: "users",
+                localField: "agentEmail",
+                foreignField: "email",
+                as: "agentInfo",
+              },
+            },
+            {
+              $unwind: "$agentInfo",
+            },
+            {
+              $match: {
+                "agentInfo.status": { $ne: "fraud" }, // Exclude fraud agents
+              },
+            },
+            {
+              $sort: { createdAt: -1 },
+            },
+            {
+              $limit: 4,
+            },
+            {
+              $project: {
+                image: 1,
+                title: 1,
+                location: 1,
+                priceMin: 1,
+                priceMax: 1,
+                status: 1,
+                agentName: "$agentInfo.name",
+              },
+            },
+          ])
+          .toArray();
+
+        res.send(advertisedProperties);
+      } catch (error) {
+        console.error("Failed to fetch advertised properties", error);
+        res
+          .status(500)
+          .send({ error: "Failed to fetch advertised properties" });
+      }
+    });
+
+    // GET: /reviews/latest for home page
+    app.get("/reviews/latest", async (req, res) => {
+      try {
+        const reviews = await reviewsCollection
+          .find()
+          .sort({ createdAt: -1 }) // latest first
+          .limit(3)
+          .toArray();
+        res.send(reviews);
+      } catch (error) {
+        console.error("Error fetching latest reviews:", error);
+        res.status(500).send({ error: "Failed to fetch latest reviews" });
+      }
+    });
+
+    // ====
+    // GET: Get user role by email
     app.get("/users/:email/role", async (req, res) => {
       try {
         const email = req.params.email;
@@ -75,14 +147,7 @@ async function run() {
       }
     });
 
-
-// =====
-
-
-
-
-
-
+    // =====
 
     app.get("/properties", async (req, res) => {
       try {
@@ -115,14 +180,22 @@ async function run() {
               },
             },
             {
-              $unwind: "$agentInfo",
+              $unwind: {
+                path: "$agentInfo",
+                preserveNullAndEmptyArrays: true, // 👈 allow properties even if agent is deleted
+              },
             },
             {
               $match: {
-                "agentInfo.role": "agent",
                 $or: [
-                  { "agentInfo.status": { $exists: false } },
-                  { "agentInfo.status": { $ne: "fraud" } },
+                  {
+                    "agentInfo.role": "agent",
+                    $or: [
+                      { "agentInfo.status": { $exists: false } },
+                      { "agentInfo.status": { $ne: "fraud" } },
+                    ],
+                  },
+                  { agentInfo: null }, // 👈 include if agentInfo is missing (user deleted)
                 ],
               },
             },
@@ -162,21 +235,33 @@ async function run() {
 
     // user review section
     // GET reviews by user email
-    app.get("/reviews", async (req, res) => {
-      const email = req.query.email;
-      if (!email) return res.status(400).send({ message: "Email required" });
+    // app.get("/reviews", async (req, res) => {
+    //   const email = req.query.email;
+    //   if (!email) return res.status(400).send({ message: "Email required" });
 
+    //   try {
+    //     const result = await db
+    //       .collection("reviews")
+    //       .find({ userEmail: email })
+    //       .toArray();
+    //     res.send(result);
+    //   } catch (err) {
+    //     res.status(500).send({ message: "Failed to fetch reviews" });
+    //   }
+    // });
+    app.get("/reviews/user", async (req, res) => {
       try {
-        const result = await db
-          .collection("reviews")
-          .find({ userEmail: email })
+        const email = req.query.email;
+        const result = await reviewsCollection
+          .find({ userEmail: email }) // <-- FIXED LINE
           .toArray();
         res.send(result);
       } catch (err) {
-        res.status(500).send({ message: "Failed to fetch reviews" });
+        res.status(500).send({ error: "Failed to load your reviews." });
       }
     });
-    //  wish list
+
+    //  wish list in user dashboard
     app.get("/wishlist", async (req, res) => {
       const email = req.query.email;
       const result = await wishlistCollection
@@ -217,22 +302,23 @@ async function run() {
     });
     // property bougth
     // Get offers by user email
-app.get("/offers/user", async (req, res) => {
-  const email = req.query.email;
-  if (!email) return res.status(400).send({ error: "Email query required" });
+    app.get("/offers/user", async (req, res) => {
+      const email = req.query.email;
+      if (!email)
+        return res.status(400).send({ error: "Email query required" });
 
-  try {
-    const offers = await offersCollection
-      .find({ buyerEmail: email })
-      .toArray();
-    res.send(offers);
-  } catch (err) {
-    res.status(500).send({ error: err.message });
-  }
-});
+      try {
+        const offers = await offersCollection
+          .find({ buyerEmail: email })
+          .toArray();
+        res.send(offers);
+      } catch (err) {
+        res.status(500).send({ error: err.message });
+      }
+    });
 
-// Update offer status after payment (mock)
-/* app.patch("/offers/pay/:id", async (req, res) => {
+    // Update offer status after payment (mock)
+    /* app.patch("/offers/pay/:id", async (req, res) => {
   const id = req.params.id;
   const { status, transactionId } = req.body;
 
@@ -496,39 +582,89 @@ app.get("/offers/user", async (req, res) => {
         res.status(500).send({ message: "Failed to delete review" });
       }
     });
+    // add section============
+    // GET all verified properties (for Advertise page)
+    // app.get("/properties/verified", async (req, res) => {
+    //   try {
+    //     const verifiedProperties = await propertiesCollection
+    //       .find({ status: "verified" })
+    //       .sort({ createdAt: -1 })
+    //       .toArray();
+    //     res.send(verifiedProperties);
+    //   } catch (error) {
+    //     console.error("Error fetching verified properties:", error);
+    //     res.status(500).send({ error: "Failed to fetch verified properties" });
+    //   }
+    // });
+
+    // PATCH update property to mark as advertised
+    app.patch("/advertise/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        if (!ObjectId.isValid(id)) {
+          return res.status(400).send({ error: "Invalid property ID" });
+        }
+
+        // Set isAdvertised = true
+        const result = await propertiesCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: { isAdvertised: true } }
+        );
+
+        if (result.modifiedCount === 0) {
+          return res
+            .status(404)
+            .send({ error: "Property not found or already advertised" });
+        }
+
+        res.send({ message: "Property advertised successfully" });
+      } catch (error) {
+        console.error("Error advertising property:", error);
+        res.status(500).send({ error: "Failed to advertise property" });
+      }
+    });
 
     // ============
 
-    //  add to wishlist
+    //  add to wishlist button
     app.post("/wishlist", async (req, res) => {
       try {
-        const data = req.body;
-        const result = await wishlistCollection.insertOne(data);
+        const newItem = {
+          ...req.body,
+          propertyId: String(req.body.propertyId), // 🔁 Ensure propertyId is string
+        };
+
+        const exists = await wishlistCollection.findOne({
+          userEmail: newItem.userEmail,
+          propertyId: newItem.propertyId,
+        });
+
+        if (exists) {
+          return res.status(400).send({ message: "Already added" });
+        }
+
+        const result = await wishlistCollection.insertOne(newItem);
         res.send(result);
-      } catch (err) {
-        res.status(500).send({ error: "Failed to add to wishlist" });
+      } catch (error) {
+        console.error("Error adding to wishlist:", error);
+        res.status(500).send({ error: "Internal Server Error" });
       }
     });
+
     // Check if property is already in wishlist
     app.get("/wishlist/check", async (req, res) => {
       const { email, propertyId } = req.query;
 
-      if (!email || !propertyId) {
-        return res
-          .status(400)
-          .send({ exists: false, message: "Missing email or propertyId" });
-      }
-
       try {
-        const exists = await db.collection("wishlist").findOne({
+        const exists = await wishlistCollection.findOne({
           userEmail: email,
-          propertyId: propertyId,
+          propertyId: String(propertyId), // 🔁 Ensure it's string
         });
 
         res.send({ exists: !!exists });
       } catch (error) {
-        console.error("Wishlist check error:", error);
-        res.status(500).send({ exists: false });
+        console.error("Error checking wishlist:", error);
+        res.status(500).send({ error: "Internal Server Error" });
       }
     });
 
@@ -546,22 +682,23 @@ app.get("/offers/user", async (req, res) => {
     });
 
     // GET /reviews/:propertyId
-    app.get("/reviews/user", async (req, res) => {
+    app.get("/reviews/:propertyId", async (req, res) => {
       try {
-        const email = req.query.email; // or req.user.email if using Firebase Auth middleware
-        if (!email) return res.status(400).send({ error: "Email is required" });
-
+        const propertyId = req.params.propertyId;
         const reviews = await reviewsCollection
-          .find({ userEmail: email })
+          .find({ propertyId: propertyId }) // Make sure propertyId in DB is a string
           .sort({ createdAt: -1 })
           .toArray();
 
         res.send(reviews);
       } catch (err) {
-        console.error("Error fetching user reviews:", err);
-        res.status(500).send({ error: "Internal server error" });
+        console.error("Error fetching reviews by propertyId:", err);
+        res
+          .status(500)
+          .send({ error: "Failed to fetch reviews for this property" });
       }
     });
+
     app.delete("/reviews/:id", async (req, res) => {
       try {
         const reviewId = req.params.id;
