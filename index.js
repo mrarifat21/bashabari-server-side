@@ -317,6 +317,31 @@ async function run() {
       }
     });
 
+    // store offer in the database
+    // ✅ Add this route to handle offers
+    app.post("/offers", async (req, res) => {
+      try {
+        const offerData = req.body;
+
+        // Optional: Add server-side validation if needed
+        if (
+          !offerData.propertyId ||
+          !offerData.buyerEmail ||
+          !offerData.offerAmount
+        ) {
+          return res.status(400).send({ message: "Missing required fields" });
+        }
+
+        offerData.createdAt = new Date(); // Add timestamp if needed
+
+        const result = await offersCollection.insertOne(offerData);
+        res.send(result);
+      } catch (error) {
+        console.error("Failed to insert offer:", error);
+        res.status(500).send({ error: "Failed to submit offer" });
+      }
+    });
+
     // Update offer status after payment (mock)
     /* app.patch("/offers/pay/:id", async (req, res) => {
   const id = req.params.id;
