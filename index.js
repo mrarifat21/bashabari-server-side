@@ -480,6 +480,65 @@ async function run() {
       res.send(result);
     });
 
+    // Get all offers for properties added by the agent
+    app.get("/offers/agent", async (req, res) => {
+      const email = req.query.email;
+      try {
+        const offers = await offersCollection
+          .find({ agentEmail: email })
+          .sort({ createdAt: -1 })
+          .toArray();
+        res.send(offers);
+      } catch (err) {
+        res.status(500).send({ error: "Failed to fetch offers" });
+      }
+    });
+
+    // Update offer status (accept or reject)
+    app.patch("/offers/update-status/:id", async (req, res) => {
+      const id = req.params.id;
+      const { status, propertyId } = req.body;
+
+      try {
+        const objectId = new ObjectId(id);
+
+        // Update the selected offer's status
+        const updateSelected = await offersCollection.updateOne(
+          { _id: objectId },
+          { $set: { status } }
+        );
+
+        let rejectedOffers = { modifiedCount: 0 };
+
+        // If accepted, reject all other offers for the same property
+        if (status === "accepted") {
+          console.log(
+            "Rejecting other offers for property:",
+            propertyId,
+            "excluding offer:",
+            id
+          );
+
+          rejectedOffers = await offersCollection.updateMany(
+            {
+              propertyId: propertyId,
+              _id: { $ne: objectId },
+            },
+            { $set: { status: "rejected" } }
+          );
+        }
+
+        res.send({
+          message: "Offer status updated",
+          updatedOffers: updateSelected.modifiedCount,
+          rejectedOffers: rejectedOffers.modifiedCount,
+        });
+      } catch (err) {
+        console.error("Error updating offer status:", err);
+        res.status(500).send({ error: "Failed to update offer status" });
+      }
+    });
+
     /* =================
       Admin Relited ApI's
   ==================== */
