@@ -304,6 +304,21 @@ app.post("/offers", async (req, res) => {
     res.status(500).send({ error: "Failed to submit offer" });
   }
 });
+app.get("/offer/:id", async (req, res) => {
+  const id = req.params.id;
+  try {
+    const offer = await offersCollection.findOne({ _id: new ObjectId(id) });
+    if (!offer) {
+      return res.status(404).send({ message: "Offer not found" });
+    }
+    res.send(offer);
+  } catch (error) {
+    console.error("Error fetching offer:", error);
+    res.status(500).send({ message: "Internal server error" });
+  }
+});
+
+
 
 // Update offer status after payment (mock)
 /* app.patch("/offers/pay/:id", async (req, res) => {
@@ -327,20 +342,6 @@ app.post("/offers", async (req, res) => {
     res.status(500).send({ error: err.message });
   }
 }); */
-
-// ==============================
-// DELETE review
-// app.delete("/reviews/:id", async (req, res) => {
-//   const { id } = req.params;
-//   try {
-//     const result = await db
-//       .collection("reviews")
-//       .deleteOne({ _id: new ObjectId(id) });
-//     res.send(result);
-//   } catch (err) {
-//     res.status(500).send({ message: "Delete failed" });
-//   }
-// });
 
 /*   ========================================
       agent  relited API's
