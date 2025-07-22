@@ -1,4 +1,3 @@
-// server.js
 const express = require("express");
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -23,7 +22,6 @@ const admin = require("firebase-admin");
 const decodedKey = Buffer.from(process.env.FB_Service_Key, "base64").toString(
   "utf8"
 );
-// const serviceAccount = require("./firebase-adminsdk.json");
 const serviceAccount = JSON.parse(decodedKey);
 
 admin.initializeApp({
@@ -41,22 +39,7 @@ const wishlistCollection = db.collection("wishlist");
 const reviewsCollection = db.collection("reviews");
 const offersCollection = db.collection("offer");
 
-//  show all properties
-
-// Get all verified properties
-/* app.get("/properties", async (req, res) => {
-      try {
-        const verifiedProperties = await propertiesCollection
-          .find({ status: "verified"})
-          .toArray();
-        res.send(verifiedProperties);
-      } catch (error) {
-        res.status(500).send({ error: "Failed to fetch properties" });
-      }
-    }); */
-
 // home page
-// Backend: Express route
 app.get("/properties/advertised", async (req, res) => {
   try {
     const advertisedProperties = await propertiesCollection
@@ -183,7 +166,7 @@ app.get("/verified-properties-by-agents", async (req, res) => {
         {
           $unwind: {
             path: "$agentInfo",
-            preserveNullAndEmptyArrays: true, // 👈 allow properties even if agent is deleted
+            preserveNullAndEmptyArrays: true, //  allow properties even if agent is deleted
           },
         },
         {
@@ -234,22 +217,6 @@ app.post("/users", async (req, res) => {
   res.send({ message: "User added", inserted: true, result });
 });
 
-// user review section
-// GET reviews by user email
-// app.get("/reviews", async (req, res) => {
-//   const email = req.query.email;
-//   if (!email) return res.status(400).send({ message: "Email required" });
-
-//   try {
-//     const result = await db
-//       .collection("reviews")
-//       .find({ userEmail: email })
-//       .toArray();
-//     res.send(result);
-//   } catch (err) {
-//     res.status(500).send({ message: "Failed to fetch reviews" });
-//   }
-// });
 app.get("/reviews/user", async (req, res) => {
   try {
     const email = req.query.email;
@@ -409,14 +376,6 @@ app.get("/users/:email", async (req, res) => {
   res.send(user);
 });
 
-/**
-     Get all properties - For testing
-     */
-// app.get("/properties", async (req, res) => {
-//   const result = await propertiesCollection.find().toArray();
-//   res.send(result);
-// });
-
 // all propertise added by egnet
 app.get("/properties/agent", async (req, res) => {
   try {
@@ -430,24 +389,6 @@ app.get("/properties/agent", async (req, res) => {
     res.status(500).send({ error: "Failed to fetch agent properties" });
   }
 });
-// get single property by id for updatePorperty.jsx
-// app.get("/properties/:id", async (req, res) => {
-//   const id = req.params.id;
-
-//   try {
-//     const property = await propertiesCollection.findOne({
-//       _id: new ObjectId(id),
-//     });
-
-//     if (!property) {
-//       return res.status(404).send({ message: "Property not found" });
-//     }
-
-//     res.send(property);
-//   } catch (err) {
-//     res.status(500).send({ error: "Failed to fetch property" });
-//   }
-// });
 
 //  delete properties
 app.delete("/properties/:id", async (req, res) => {
@@ -465,8 +406,6 @@ app.delete("/properties/:id", async (req, res) => {
 app.patch("/properties/:id", async (req, res) => {
   const id = req.params.id;
   const updatedProperty = req.body;
-  // console.log("Update request for property ID:", id);
-  // console.log("Update data:", updatedProperty);
 
   const result = await propertiesCollection.updateOne(
     { _id: new ObjectId(id) },
@@ -538,19 +477,6 @@ app.patch("/offers/update-status/:id", async (req, res) => {
 /* =================
       Admin Relited ApI's
   ==================== */
-// Get all pending properties
-
-// app.get("/properties/pending", async (req, res) => {
-//   try {
-//     const pendingProperties = await propertiesCollection
-//       .find({ status: "pending" })
-//       .toArray();
-//     res.send(pendingProperties);
-//   } catch (error) {
-//     console.error("Error fetching pending properties:", error);
-//     res.status(500).send({ error: "Failed to fetch pending properties" });
-//   }
-// });
 
 // get single property by id for updatePorperty.jsx
 app.get("/properties/:id", async (req, res) => {
@@ -663,19 +589,6 @@ app.delete("/admin/reviews/:id", async (req, res) => {
   }
 });
 // add section============
-// GET all verified properties (for Advertise page)
-// app.get("/properties/verified", async (req, res) => {
-//   try {
-//     const verifiedProperties = await propertiesCollection
-//       .find({ status: "verified" })
-//       .sort({ createdAt: -1 })
-//       .toArray();
-//     res.send(verifiedProperties);
-//   } catch (error) {
-//     console.error("Error fetching verified properties:", error);
-//     res.status(500).send({ error: "Failed to fetch verified properties" });
-//   }
-// });
 
 // PATCH update property to mark as advertised
 app.patch("/advertise/:id", async (req, res) => {
